@@ -4,8 +4,8 @@ Attribute VB_Name = "BidGulp"
 '***********************************************************************
 Public Const module_name As String = "BidGulp"
 Public Const module_author As String = "Ben Fisher"
-Public Const module_version As String = "1.0.1"
-Public Const module_date As Date = #5/16/2024#
+Public Const module_version As String = "1.0.7"
+Public Const module_date As Date = #5/31/2024#
 Public Const module_notes As String = _
     "As is typical, in a rush to get usable code on the street, so " & _
     "opportunities for refactoring abound. But for now, it'll do."
@@ -26,7 +26,7 @@ Public Const module_license As String = "Created by Ben Fisher, GNU General Publ
 '***********************************************************************
 ' Table Placement on Worksheet
 Public Const METADATA_TARGET_CELL As String = "A1"
-Public Const TABLE_TARGET_CELL As String = "A7"
+Public Const TABLE_TARGET_CELL As String = "A10"
 
 ' Typical Table Prefer
 Public Const VERTICALPADDING = 10
@@ -41,6 +41,7 @@ Public Const OFFICEOFCOUNSELCOLOR = webcolors.LIMEGREEN
 Public Const CONTRACTINGCOLOR = webcolors.PURPLE
 Public Const LESSONSLEARNEDCOLOR = webcolors.ORANGERED
 
+Public Const TIMESTAMPFILE = False
 
 '***********************************************************************
 '                       Table Configuration Enums
@@ -89,14 +90,6 @@ Public Enum Widths
     XXXL = 72
 End Enum
 
-Public Type UserFormat
-    ' Used for storing a validation condition and the associated formats
-    Condition As String
-    InteriorColor As Long
-    FontColor As Long
-    IsFontBold As Boolean
-End Type
-
 '***********************************************************************
 '                      Paths, Workbooks, and Sheets
 '***********************************************************************
@@ -128,7 +121,7 @@ End Function
 
 Function CreateWorkbook(save_path As String, _
     Optional workbook_name As String = "Bidder RFI Summary Report", _
-    Optional include_timestamp As Boolean = True) As Workbook
+    Optional include_timestamp As Boolean = TIMESTAMPFILE) As Workbook
     ' Return a  new Workbook object with the provided name
     ' and appends with a timestamp as noted.
     Dim combined_workbook As Workbook
@@ -185,33 +178,6 @@ Function RenameSheet(ByVal target_sheet As Worksheet, ByVal sheet_name As String
 dump:
 End Function
 
-Sub AddNewSheet(wb As Workbook)
-    Dim sht As Worksheet
-    Set sht = wb.Sheets.Add
-    RenameSheet sht, TABLENAME
-End Sub
-
-Sub CopyWorksheetCode(fromSheet As Worksheet, _
-                        destinationSheet As Worksheet)
-    'Requires reference to 'Microsoft Visual Basic for
-    ' Applications Extensibility 5.3" and you must check
-    ' YES to "Trust Access to VBA Object Model" in Macro
-    ' Security Settings
-    Dim VBAEditor As VBIDE.VBE
-    Dim VBProj As VBIDE.VBProject
-    Dim VBCompFrom As VBIDE.VBComponent
-    Dim VBCompTo As VBIDE.VBComponent
-
-    Set VBAEditor = Application.VBE
-    Set VBProj = VBAEditor.ActiveVBProject
-    Set VBCompFrom = VBProj.VBComponents(fromSheet.CodeName)
-    Set VBCompTo = VBProj.VBComponents(destinationSheet.CodeName)
-
-    codeString = VBCompFrom.CodeModule.Lines(1, VBCompFrom.CodeModule.CountOfLines)
-
-    VBCompTo.CodeModule.DeleteLines 1, VBCompTo.CodeModule.CountOfLines
-    VBCompTo.CodeModule.InsertLines 1, codeString
-End Sub
 
 '***********************************************************************
 '                            Parse to Array
@@ -368,7 +334,7 @@ Function RangeToTable(headerRange As Range, sht As Worksheet, _
     Optional tblName As String = TABLENAME) As ListObject
 
     Dim newName As String
-    newName = tblName & AutoincrementTableName(tblName)
+    newName = AutoincrementTableName(tblName)
 
     If IntersectsTable(headerRange) = False Then
         sht.ListObjects.Add(xlSrcRange, headerRange, , xlYes).Name = newName
@@ -411,10 +377,16 @@ Public Sub WriteMetaData(sht As Worksheet, _
         .Font.Size = 14
         .EntireRow.AutoFit
     End With
+    With sht.Range(METADATA_TARGET_CELL).Offset(2, 0)
+        .Value = "Report created " & Format(Now, "dd MMM YYYY at hh:mm")
+        .VerticalAlignment = xlVAlignTop
+        .EntireRow.RowHeight = 20
+    End With
+   
    
     Dim FullWidthRange As Range
     Set FullWidthRange = sht.Range(METADATA_TARGET_CELL, _
-                     sht.Range(METADATA_TARGET_CELL).Offset(5, FieldNos.[_Last] - 1))
+                     sht.Range(METADATA_TARGET_CELL).Offset(8, FieldNos.[_Last] - 1))
     With FullWidthRange
         .HorizontalAlignment = xlCenterAcrossSelection
         .Interior.Color = METAINTERIORCOLOR
@@ -422,33 +394,33 @@ Public Sub WriteMetaData(sht As Worksheet, _
     End With
     
     Dim arr As Variant
-    arr = Array("PM: ", "TL: ", "TS: ")
-    With sht.Range(METADATA_TARGET_CELL).Offset(2, 0).Resize(UBound(arr) + 1, 1)
+    arr = Array("PM:", "TL:", "TS:", "COR:", "CS:")
+    With sht.Range(METADATA_TARGET_CELL).Offset(3, 0).Resize(UBound(arr) + 1, 1)
         .Value = WorksheetFunction.Transpose(arr)
         .HorizontalAlignment = xlHAlignLeft
         .Font.Name = "Arial Black"
     End With
    
     Set arr = Nothing
-    arr = Array("<PM Name>", "<TL Name>", "<TS POC Name>")
-    With sht.Range(METADATA_TARGET_CELL).Offset(2, 1).Resize(UBound(arr) + 1, 1)
+    arr = Array("<PM Name>", "<TL Name>", "<TS POC Name>", "<COR Name>", "<CS Name>")
+    With sht.Range(METADATA_TARGET_CELL).Offset(3, 1).Resize(UBound(arr) + 1, 1)
         .Value = WorksheetFunction.Transpose(arr)
         .HorizontalAlignment = xlHAlignLeft
     End With
     
-    With sht.Range(METADATA_TARGET_CELL).Offset(5, 1)
+    With sht.Range(METADATA_TARGET_CELL).Offset(8, 1)
         .Value = ChrW(RIGHTHOLLOWARROW)
         .HorizontalAlignment = xlHAlignRight
         .Font.Color = webcolors.SADDLEBROWN
     End With
     
-    With sht.Range(METADATA_TARGET_CELL).Offset(5, 6)
+    With sht.Range(METADATA_TARGET_CELL).Offset(8, 6)
         .Value = ChrW(LEFTHOLLOWARROW) & " Expand for Detailed Data"
         .HorizontalAlignment = xlHAlignLeft
         .Font.Color = webcolors.SADDLEBROWN
     End With
     
-    With sht.Range(METADATA_TARGET_CELL).Offset(5, FieldNos.[_Last] - 1)
+    With sht.Range(METADATA_TARGET_CELL).Offset(8, FieldNos.[_Last] - 1)
         .Value = "Created using " & module_name & " v." & module_version
         .HorizontalAlignment = xlHAlignRight
         .Font.Size = 8
@@ -601,14 +573,6 @@ End Sub
 '***********************************************************************
 '                       Advanced Table Formatting
 '***********************************************************************
-Public Sub FormatSelectionWithUserFormat(uf As UserFormat)
-    With Selection
-        .Interior.Color = uf.InteriorColor
-        .Font.Color = uf.FontColor
-        .Font.Bold = uf.IsFontBold
-    End With
-End Sub
-
 Public Sub ApplyDefaultValues(aTable As ListObject)
     Application.EnableEvents = False
     Application.ScreenUpdating = False
@@ -621,19 +585,6 @@ Public Sub ApplyDefaultValues(aTable As ListObject)
         Next i
     End If
 
-    With aTable.ListColumns("Contracting Response").DataBodyRange
-        .Interior.Color = webcolors.LAVENDER
-        .Font.Color = ContrastText(.Interior.Color)
-    End With
-    With aTable.ListColumns("OC Response").DataBodyRange
-        .Interior.Color = webcolors.HONEYDEW
-        .Font.Color = ContrastText(.Interior.Color)
-    End With
-    With aTable.ListColumns("JED LL Capture").DataBodyRange
-        .Interior.Color = webcolors.MISTYROSE
-        .Font.Color = ContrastText(.Interior.Color)
-    End With
-
     Application.ScreenUpdating = True
     Application.EnableEvents = True
     Application.DisplayAlerts = True
@@ -641,7 +592,8 @@ End Sub
 
 Sub ApplyStatusFormats(aTable As ListObject, _
                         targetColumn As Variant, _
-                        selectionSet As String)
+                        selectionSet As String, _
+                        formatSets As Collection)
     'NOTE: This method inserts conditional formatting based on the validation "dropdown" list
     ' values in the targetColumn. Values must match those in selectionSet (not case sensitive).
     ' hasSecondaryFormats highlights the whole row with accent scheme, while the main
@@ -681,33 +633,13 @@ Sub ApplyStatusFormats(aTable As ListObject, _
             Formula1:="=IF(LOWER(" & firstCell & ")=" & choices(i) & ",TRUE,FALSE)"
     Next
 
-    With statusColumn.FormatConditions(1)
-        '<RED>
-        .Interior.Color = webcolors.MISTYROSE  'webcolors.TOMATO
-        .Font.Color = webcolors.FIREBRICK 'ContrastText(.Interior.Color)
-        .Font.Bold = True
-    End With
-
-    With statusColumn.FormatConditions(2)
-        '<YELLOW>
-        .Interior.Color = webcolors.LEMONCHIFFON  'webcolors.GOLD
-        .Font.Color = webcolors.SADDLEBROWN 'ContrastText(.Interior.Color)
-        .Font.Bold = False
-    End With
-
-    With statusColumn.FormatConditions(3)
-        '<GREEN>
-        .Interior.Color = webcolors.PALEGREEN 'webcolors.MEDIUMSEAGREEN
-        .Font.Color = webcolors.DARKGREEN
-        .Font.Bold = False
-    End With
-    
-    With statusColumn.FormatConditions(4)
-        '<GRAY>
-        .Interior.Color = RGB(225, 225, 225)
-        .Font.Color = ContrastText(.Interior.Color)
-        .Font.Bold = False
-    End With
+    For i = 1 To formatSets.Count
+        With statusColumn.FormatConditions(i)
+            .Interior.Color = formatSets(i)("interior")
+            .Font.Color = formatSets(i)("font")
+            .Font.Bold = formatSets(i)("bold")
+        End With
+    Next
 
     ' Remove dummy row needed for adding to empty table
     If temporaryRow Then aTable.ListRows.Item(1).Delete
@@ -746,7 +678,7 @@ Sub MuteDefaultDiscipline(aTable As ListObject, _
 
     With statusColumn.FormatConditions(1)
         '<GRAY>
-        .Interior.Color = RGB(230, 230, 230)
+        .Interior.Color = RGB(235, 235, 235)
         .Font.Color = webcolors.DARKSLATEGRAY
         .Font.Bold = False
     End With
@@ -756,27 +688,202 @@ Sub MuteDefaultDiscipline(aTable As ListObject, _
 
 End Sub
 
-Public Sub AddAllDropdowns(aTable As ListObject)
+Sub HighlightContractingCell(aTable As ListObject, _
+                          targetColumn As Variant, _
+                          taskerColumn As Variant, _
+                          formatSets As Collection)
+    'NOTE: This Proc is based on the principles of ApplyStatusFormats(), except that it
+    ' specifically looks at a non-empty cell to trigger the condition, and then applies
+    ' conditional formatting as input.
     
+    ' Test for empty table
+    Dim temporaryRow As Boolean
+    If TableHasData(aTable) = False Then
+        aTable.ListRows.Add
+        With aTable.ListRows(1).Range
+            .Font.Bold = False
+            .Font.Color = webcolors.BLACK
+            .Font.Size = TYPICALFONTSIZE
+        End With
+        temporaryRow = True
+    End If
+    
+    Dim statusColumn As Range
+    Set statusColumn = aTable.ListColumns(targetColumn).DataBodyRange
+
+    Dim checkColumn As Range
+    Set checkColumn = aTable.ListColumns(taskerColumn).DataBodyRange
+
+    Dim firstCell As String
+    firstCell = "$" & Replace(checkColumn(1).Address, "$", "")
+    
+    Dim statusFirstCell As String
+    statusFirstCell = "$" & Replace(statusColumn(1).Address, "$", "")
+
+
+    statusColumn.FormatConditions.Delete
+    statusColumn.FormatConditions.Add Type:=xlExpression, _
+        Formula1:="=IF(OR(TRIM(" & firstCell & ")=""Contracting"", " & statusFirstCell & "<>""""),TRUE,FALSE)"
+            
+    
+    For i = 1 To formatSets.Count
+        With statusColumn.FormatConditions(i)
+            .Interior.Color = formatSets(i)("interior")
+            .Font.Color = formatSets(i)("font")
+            .Font.Bold = formatSets(i)("bold")
+        End With
+    Next
+
+    ' Remove dummy row needed for adding to empty table
+    If temporaryRow Then aTable.ListRows.Item(1).Delete
+
+End Sub
+
+Sub HighlightTaskerCell(aTable As ListObject, _
+                          targetColumn As Variant, _
+                          taskerColumn As Variant, _
+                          formatSets As Collection)
+    'NOTE: This Proc is based on the principles of ApplyStatusFormats(), except that it
+    ' specifically looks at a non-empty cell to trigger the condition, and then applies
+    ' conditional formatting as input.
+    
+    ' Test for empty table
+    Dim temporaryRow As Boolean
+    If TableHasData(aTable) = False Then
+        aTable.ListRows.Add
+        With aTable.ListRows(1).Range
+            .Font.Bold = False
+            .Font.Color = webcolors.BLACK
+            .Font.Size = TYPICALFONTSIZE
+        End With
+        temporaryRow = True
+    End If
+    
+    Dim statusColumn As Range
+    Set statusColumn = aTable.ListColumns(targetColumn).DataBodyRange
+
+    Dim checkColumn As Range
+    Set checkColumn = aTable.ListColumns(taskerColumn).DataBodyRange
+
+    Dim firstCell As String
+    firstCell = "$" & Replace(checkColumn(1).Address, "$", "")
+
+    statusColumn.FormatConditions.Delete
+    statusColumn.FormatConditions.Add Type:=xlExpression, _
+            Formula1:="=IF(" & firstCell & "<>"""",TRUE,FALSE)"
+    
+    For i = 1 To formatSets.Count
+        With statusColumn.FormatConditions(i)
+            .Interior.Color = formatSets(i)("interior")
+            .Font.Color = formatSets(i)("font")
+            .Font.Bold = formatSets(i)("bold")
+        End With
+    Next
+
+    ' Remove dummy row needed for adding to empty table
+    If temporaryRow Then aTable.ListRows.Item(1).Delete
+
+End Sub
+
+
+Public Sub AddAllFormattedDropdowns(aTable As ListObject)
+    
+    InsertDropdown aTable:=aTable, targetColumn:=FieldNos.AssignedDiscipline, _
+        selectionSet:="Installation, Civil, Geotech, Environmental, Architecture, Structural, Mechanical, Plumbing, Electrical, Comm, Cyber, Contracting, Specs", _
+        suppressError:=True
+        
     MuteDefaultDiscipline aTable:=aTable, targetColumn:=FieldNos.AssignedDiscipline
     
-    InsertDropdown aTable:=aTable, targetColumn:=FieldNos.HasTechLeadQA, selectionSet:="No, Pending, Yes, N/A"
-    InsertDropdown aTable:=aTable, targetColumn:=FieldNos.RequiresAmendment, selectionSet:="Yes, TBD, No, N/A"
+    InsertDropdown aTable:=aTable, targetColumn:=FieldNos.AssignedParty, selectionSet:="AE(DBB), Contracting, TL, PM, SME, MCX, COS, PDT(DB)"
     
-    ApplyStatusFormats aTable, targetColumn:=FieldNos.HasTechLeadQA, selectionSet:="No, Pending, Yes, N/A"
-    ApplyStatusFormats aTable, targetColumn:=FieldNos.RequiresAmendment, selectionSet:="Yes, TBD, No, N/A"
+    'Create colors schemes
+    Dim alert As New Dictionary
+    Dim warn As New Dictionary
+    Dim good As New Dictionary
+    Dim muted As New Dictionary
     
-    'InsertDropdown aTable:=aTable, targetColumn:=FieldNos.AssignedDiscipline, _
-        selectionSet:="PM, Arch, Civil, Struct, Geotech, Mech, Plumb, Elec, Comm, Cyber, ATFP, Hazmat, Enviro, Sustain"
+    alert.Add Key:="interior", Item:=webcolors.ORANGERED
+    alert.Add Key:="font", Item:=ContrastText(alert("interior"))
+    alert.Add Key:="bold", Item:=True
+
+    warn.Add Key:="interior", Item:=webcolors.YELLOW
+    warn.Add Key:="font", Item:=ContrastText(warn("interior"))
+    warn.Add Key:="bold", Item:=False
+
+    good.Add Key:="interior", Item:=webcolors.LIMEGREEN    'RGB(0, 176, 80)
+    good.Add Key:="font", Item:=ContrastText(good("interior"))
+    good.Add Key:="bold", Item:=True
+
+    muted.Add Key:="interior", Item:=RGB(235, 235, 235)
+    muted.Add Key:="font", Item:=webcolors.DARKSLATEGRAY
+    muted.Add Key:="bold", Item:=False
     
-    InsertDropdown aTable:=aTable, targetColumn:=FieldNos.AssignedParty, selectionSet:="AE, SME, Other"
+    Dim formats As Collection
+    
+    'Create dropdowns and conditional formats for Requires Amendment column
+    Dim choices As String
+    Set formats = New Collection
+    formats.Add alert
+    formats.Add good
+    formats.Add muted
+        
+    choices = "Yes, No, TBD"
+    InsertDropdown aTable:=aTable, targetColumn:=FieldNos.RequiresAmendment, selectionSet:=choices
+    ApplyStatusFormats aTable, targetColumn:=FieldNos.RequiresAmendment, selectionSet:=choices, formatSets:=formats
+    
+    'Create dropdowns and conditional formats for Has Tech Lead QA column
+    Set formats = New Collection
+    formats.Add alert
+    formats.Add good
+    
+    choices = "No, Yes"
+    InsertDropdown aTable:=aTable, targetColumn:=FieldNos.HasTechLeadQA, selectionSet:=choices
+    ApplyStatusFormats aTable, targetColumn:=FieldNos.HasTechLeadQA, selectionSet:=choices, formatSets:=formats
+    
+    Set alert = Nothing
+    Set warn = Nothing
+    Set good = Nothing
+    Set muted = Nothing
+    
+    'Create formatting for Contracting response
+    Set formats = New Collection
+    
+    Dim tasker As New Dictionary
+    tasker.Add Key:="interior", Item:=webcolors.LAVENDER
+    tasker.Add Key:="font", Item:=ContrastText(tasker("interior"))
+    tasker.Add Key:="bold", Item:=False
+    
+    formats.Add tasker
+    HighlightContractingCell aTable:=aTable, targetColumn:=FieldNos.ContractingResponse, _
+        taskerColumn:=FieldNos.AssignedDiscipline, formatSets:=formats
+    
+    'Create formatting for OC response
+    tasker.RemoveAll
+    tasker.Add Key:="interior", Item:=webcolors.HONEYDEW
+    tasker.Add Key:="font", Item:=ContrastText(tasker("interior"))
+    tasker.Add Key:="bold", Item:=False
+    
+    Set formats = New Collection
+    formats.Add tasker
+    HighlightTaskerCell aTable:=aTable, targetColumn:=FieldNos.OfficeOfCounselResponse, _
+        taskerColumn:=FieldNos.OfficeOfCounselResponse, formatSets:=formats
+    
+    'Create formatting for JED LL Capture response
+    tasker.RemoveAll
+    tasker.Add Key:="interior", Item:=webcolors.MISTYROSE
+    tasker.Add Key:="font", Item:=ContrastText(tasker("interior"))
+    tasker.Add Key:="bold", Item:=False
+    
+    Set formats = New Collection
+    formats.Add tasker
+    HighlightTaskerCell aTable:=aTable, targetColumn:=FieldNos.LessonsLearnedCapture, _
+        taskerColumn:=FieldNos.LessonsLearnedCapture, formatSets:=formats
 
 End Sub
 
 '***********************************************************************
 '                      Report Creation Procedures
 '***********************************************************************
-
 
 Public Sub ReformatSheet(sht As Worksheet)
     
@@ -795,7 +902,7 @@ Public Sub ReformatSheet(sht As Worksheet)
     FormatHeaderRow sht
     
     ApplySimpleStyleToTable aTable
-    AddAllDropdowns aTable
+    AddAllFormattedDropdowns aTable
 
     Application.ScreenUpdating = True
 End Sub
@@ -821,7 +928,7 @@ Public Sub DestructiveReformatSheet(sht As Worksheet)
     FormatHeaderRow sht
     
     ApplySimpleStyleToTable aTable
-    AddAllDropdowns aTable
+    AddAllFormattedDropdowns aTable
     Application.ScreenUpdating = True
 End Sub
 
@@ -932,7 +1039,12 @@ Public Sub ParseReportHTML(fPath As String, sht As Worksheet)
 '        "Time per comment: " & Format((eTime - sTime) / commentsCount, "0.000") & _
 '        " sec/comment.", vbInformation & vbOkay, "Success"
 
-
+    Set html = Nothing
+    Set http = Nothing
+    
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+    Exit Sub
 invalid_error:
     Debug.Print "Invalid File or File Path."
     Set html = Nothing
@@ -948,6 +1060,15 @@ Private Sub OverwriteReportToActiveSheet()
     ParseReportHTML GetHTMLPath, ActiveSheet
 End Sub
 
+Private Sub CheckWBs()
+
+    For Each wb In Application.Workbooks
+        Debug.Print wb.Name
+    Next
+    Debug.Print ThisWorkbook.Name
+End Sub
+
+
 Public Sub WriteToNewFile()
 
     Dim htmlPath As String
@@ -955,7 +1076,10 @@ Public Sub WriteToNewFile()
 
     If htmlPath <> "" Then
         Dim wb As Workbook
+        Dim sourceWB As Workbook
+        
         Dim sht As Worksheet
+        Dim instrSht As Worksheet
     
         Dim fso As FileSystemObject
         Set fso = New FileSystemObject
@@ -965,23 +1089,42 @@ Public Sub WriteToNewFile()
         Dim timeStamp As String
             
         Set wb = Workbooks.Add
+        Set sourceWB = ThisWorkbook 'Should be BidGulp
+        Set instrSht = sourceWB.Sheets("Instructions")
+        
         Application.DisplayAlerts = False
         
         With wb
             .Title = friendlyName
-            fileName = fso.GetParentFolderName(htmlPath) & "\" & _
-                        friendlyName & " " & _
-                        Format(Now(), "YYYY-MM-DD hh-mm-ss") & ".xlsx"
+            If TIMESTAMPFILE Then
+                fileName = fso.GetParentFolderName(htmlPath) & "\" & _
+                            friendlyName & " " & _
+                            Format(Now(), "YYYY-MM-DD hh-mm-ss") & ".xlsx"
+            Else
+                fileName = fso.GetParentFolderName(htmlPath) & "\" & _
+                            friendlyName & ".xlsx"
+            End If
             
-            Set fso = Nothing
+            
             
             DestructiveReformatSheet wb.Sheets(1)
             ParseReportHTML htmlPath, wb.Sheets(1)
             
             wb.Sheets(1).Name = IterateSheetName("RFIs")
+            instrSht.Copy Before:=wb.Sheets(1)
+            wb.Sheets(1).Visible = True
+            
+            wb.Sheets("RFIs").Activate
             
             Dim pocD As POCDialog
             Set pocD = New POCDialog
+            
+            If fso.FileExists(fileName) Then
+                fileName = fso.GetParentFolderName(htmlPath) & "\" & _
+                            friendlyName & " " & _
+                            Format(Now(), "YYYY-MM-DD hh-mm-ss") & ".xlsx"
+            End If
+            Set fso = Nothing
             
             .SaveAs fileName:=fileName, FileFormat:=xlOpenXMLWorkbook
             Set pocD = Nothing
@@ -1111,6 +1254,17 @@ Public Sub AddToExistingFile()
         Set pocD = Nothing
     End If
     
+    Set html = Nothing
+    Set http = Nothing
+
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+
+    ' Dispose objects
+    Set eComments = Nothing
+    Set aTable = Nothing
+    Set sht = Nothing
+    Exit Sub
 invalid_error:
     Debug.Print "Invalid File or File Path."
     Set html = Nothing
@@ -1126,27 +1280,101 @@ invalid_error:
 
 End Sub
 
+
+Public Sub MergeTables(sourceTable As ListObject, targetTable As ListObject, _
+    Optional mergeFields As String = "Response Discussions, Preliminary Response")
+   
+    Dim srcIDRange As Range
+    Dim srcIDDict As Dictionary
+    Set srcIDRange = sourceTable.ListColumns("Comment ID").DataBodyRange
+    Set srcIDDict = New Dictionary
+    For Each anID In srcIDRange
+        srcIDDict.Add Key:=anID.Value, Item:=anID.Row - Range(TABLE_TARGET_CELL).Row
+    Next
+    
+    Dim tarIDRange As Range
+    Dim tarIDDict As Dictionary
+    Set tarIDRange = targetTable.ListColumns("Comment ID").DataBodyRange
+    Set tarIDDict = New Dictionary
+    For Each anID In tarIDRange
+        tarIDDict.Add Key:=anID.Value, Item:=anID.Row - Range(TABLE_TARGET_CELL).Row
+    Next
+    
+    Dim sColumn As Range, sRowIndex As Long
+    Dim tColumn As Range, tRowIndex As Long
+    Dim allMergeFields As Variant
+    
+    allMergeFields = ParseToArray(mergeFields)
+    On Error Resume Next
+    For Each aField In allMergeFields
+        Set sColumn = sourceTable.ListColumns(aField).DataBodyRange
+        Set tColumn = targetTable.ListColumns(aField).DataBodyRange
+        For Each anID In srcIDDict.Keys
+            If tarIDDict.Exists(anID) Then
+                sRowIndex = srcIDDict(anID)
+                rRowIndex = tarIDDict(anID)
+                If sColumn(sRowIndex).Value <> "" And tColumn(rRowIndex).Value = "" Then
+                    With tColumn(rRowIndex)
+                        .Value = sColumn(sRowIndex).Value
+                        .Font.Color = webcolors.ORANGERED
+                    End With
+                End If
+            End If
+        Next
+    Next
+    On Error GoTo 0
+    
+    Set srcIDDict = Nothing
+    Set tarIDDict = Nothing
+End Sub
+
+Public Sub MergeFiles()
+
+    Dim mergeForm As mergeSelectForm
+    Set mergeForm = New mergeSelectForm
+    
+    Unload mergeForm
+    
+End Sub
+
+
+
 '***********************************************************************
 '                          Developer Procedures
 '***********************************************************************
 Private Sub UpdateVersionNumber()
-    With ThisWorkbook.Sheets("Macros")
-        .Unprotect Password:=""
-        With .Range("K3")
-            .Value = module_name & " v." & module_version
-            .HorizontalAlignment = xlHAlignRight
-            .Font.Size = 9
-            .Font.Italic = True
-        End With
-        .Protect DrawingObjects:=True, Contents:=True, Scenarios:=True, _
-                AllowFiltering:=True, UserInterfaceOnly:=True, Password:=""
-        .EnableSelection = xlUnlockedCells
-        .EnableOutlining = True
-    End With
+    For Each sht In ThisWorkbook.Sheets
+        If sht.Name = "Macros" Then
+            With ThisWorkbook.Sheets("Macros")
+                .Unprotect Password:=""
+                With .Range("K3")
+                    .Value = module_name & " v." & module_version
+                    .HorizontalAlignment = xlHAlignRight
+                    .Font.Size = 9
+                    .Font.Italic = True
+                End With
+                .Protect DrawingObjects:=True, Contents:=True, Scenarios:=True, _
+                        AllowFiltering:=True, UserInterfaceOnly:=True, Password:=""
+                .EnableSelection = xlUnlockedCells
+                .EnableOutlining = True
+            End With
+        Else
+            With sht
+                .Protect DrawingObjects:=True, Contents:=True, Scenarios:=True, _
+                        AllowFiltering:=True, UserInterfaceOnly:=True, Password:=""
+                .EnableSelection = xlUnlockedCells
+                .EnableOutlining = True
+            End With
+        End If
+    Next
+
+
 
 End Sub
 
-Private Sub UnprotectSheet()
-    ThisWorkbook.Sheets("Macros").Unprotect Password:=""
+Private Sub UnprotectSheets()
+    For Each sht In ThisWorkbook.Sheets
+        sht.Unprotect Password:=""
+    Next
 End Sub
 

@@ -1,10 +1,10 @@
 VERSION 5.00
 Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} selectForm 
    Caption         =   "Select Form"
-   ClientHeight    =   5070
-   ClientLeft      =   60
-   ClientTop       =   180
-   ClientWidth     =   6570
+   ClientHeight    =   4140
+   ClientLeft      =   216
+   ClientTop       =   780
+   ClientWidth     =   6636
    OleObjectBlob   =   "selectForm.frx":0000
    StartUpPosition =   1  'CenterOwner
 End
@@ -53,7 +53,9 @@ Private Sub selectWorkbookButton_Click()
     If selectedPath <> "" Then
         targetWBPath = selectedPath
         Me.selectedWBPathLabel.Caption = selectedPath
-        Call PopulateWorksheetList(selectedPath)
+        Call PopulateWorksheetList(selectedPath, Me.worksheetListBox)
+        
+        Me.worksheetListBox.Selected(0) = True
     End If
 End Sub
 
@@ -84,7 +86,7 @@ Private Function GetAWBPath() As String
     End With
 End Function
 
-Public Sub PopulateWorksheetList(wbPath As String)
+Public Sub PopulateWorksheetList(wbPath As String, aListBox As MSForms.ListBox)
 
     If wbPath <> "" Then
         ' REFERENCE: Microsoft ActiveX Data Objects 6.1 Library
@@ -104,8 +106,8 @@ Public Sub PopulateWorksheetList(wbPath As String)
         Set rsSheets = cn.OpenSchema(adSchemaTables)
         Do Until rsSheets.EOF
             sName = Replace(rsSheets.Fields("TABLE_NAME").Value, "$", "")
-            If LCase(Left(sName, 5)) <> "vhide" And LCase(Left(sName, 13)) <> "instructions" Then
-                Me.worksheetListBox.AddItem sName
+            If LCase(sName) <> "instructions" Then
+                aListBox.AddItem sName
             End If
             rsSheets.MoveNext
         Loop
@@ -120,5 +122,4 @@ Private Sub UserForm_Initialize()
         BidGulp.module_name & " v." & BidGulp.module_version
     Me.Show
 End Sub
-
 
